@@ -57,9 +57,9 @@ jobs:
       uses: docker/setup-buildx-action@v2
 
     - name: Build and tag
-      uses: docker/build-push-action@v3
-      context: .
+      uses: docker/build-push-action@v3      
       with:
+        context: .
         push: false
         tags: gcr.io/sandbox3/tftggatst/${{ matrix.project }}:${{ env.DOCKER_IMAGE_TAG }}
 

@@ -59,6 +59,7 @@ jobs:
     - name: Build and tag
       uses: docker/build-push-action@v3      
       with:
+        context: ./${{ matrix.project }}
         push: false
         tags: gcr.io/sandbox3/tftggatst/${{ matrix.project }}:${{ env.DOCKER_IMAGE_TAG }}
 

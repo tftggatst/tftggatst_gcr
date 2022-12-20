@@ -1,0 +1,127 @@
+name: 'Build and push container to GCP GCR'
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+jobs:
+   # JOB to run change detection
+  changes:
+    runs-on: ubuntu-latest
+    # Required permissions
+    outputs:
+      # Expose matched filters as job output variable
+      projects: ${{ steps.filter.outputs.changes }}
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: |
+          sandbox3: 
+            - 'sandbox3/**'
+          
+  
+  buildandpush:
+    needs: changes
+    if: ${{ needs.changes.outputs.projects != '[]' && needs.changes.outputs.projects != '' }}
+    strategy:
+      matrix:
+        # Parse JSON array containing names of all filters matching any of changed files          
+        project: ${{ fromJSON(needs.changes.outputs.projects) }}
+    runs-on: ubuntu-latest
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: "./${{ matrix.project }}"
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Sets tag for PR
+      run: |
+        echo "DOCKER_IMAGE_TAG=PR" >> $GITHUB_ENV      
+
+    - name: Set tag for merge to main
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        echo "DOCKER_IMAGE_TAG=latest" >> $GITHUB_ENV
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build and tag
+      uses: docker/build-push-action@v3
+      context: .
+      with:
+        push: false
+        tags: gcr.io/sandbox3/tftggatst/${{ matrix.project }}:${{ env.DOCKER_IMAGE_TAG }}
+
+    - name: Login to Google Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: gcr.io
+        username: _json_key
+        password: ${{ secrets.GOOGLE_CREDENTIALS }}
+
+    - name: Push to GCR
+      shell: bash
+      run: docker push gcr.io/sandbox3/tftggatst/${{ matrix.project }}:${{ env.DOCKER_IMAGE_TAG }}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      # Install the latest version of Terragrunt CLI and configure the Terragrunt CLI configuration file with a Terragrunt Cloud user API token
+    - name: Setup Terraform v1.2.6
+      uses: hashicorp/setup-Terraform@v2
+      with:
+        terraform_version: 1.2.6
+        terraform_wrapper: false
+    - name: Setup Terraform version
+      run: terraform --version
+    - name: Setup Terraform wrapper path
+      run: which terraform
+
+    - name: Setup Terragrunt v0.38.4
+      run: |
+        sudo wget -q -O /bin/terragrunt "https://github.com/gruntwork-io/terragrunt/releases/download/v0.38.4/terragrunt_linux_amd64"
+        sudo chmod +x /bin/terragrunt
+        terragrunt -v
+
+    # Initialize a new or existing Terragrunt working directory by creating initial files, loading any remote state, downloading modules, etc.
+    - name: Terragrunt Init
+      run: terragrunt init --terragrunt-non-interactive
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+
+    # Generates an execution plan for Terragrunt
+    - name: Terragrunt Plan
+      run: terragrunt run-all plan --terragrunt-non-interactive
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+
+        # On push to main, build or change infrastructure according to Terragrunt configuration files
+        # Note: It is recommended to set up a required "strict" status check in your repository for "Terragrunt Cloud". See the documentation on "strict" required status checks for more information: https://help.github.com/en/github/administering-a-repository/types-of-required-status-checks
+    - name: Terragrunt Apply
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: terragrunt run-all apply --terragrunt-non-interactive
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}

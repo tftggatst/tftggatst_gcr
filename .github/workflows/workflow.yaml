@@ -68,7 +68,7 @@ jobs:
       with:
         context: ./${{ matrix.project }}
         push: true
-        tags: gcr.io/${{ matrix.project }}/tftggatst:${{ env.DOCKER_IMAGE_TAG }}
+        tags: gcr.io/sandbox3-372220/tftggatst:${{ env.DOCKER_IMAGE_TAG }}
 
 
 
